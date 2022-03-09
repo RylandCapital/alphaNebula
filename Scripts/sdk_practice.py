@@ -19,5 +19,3 @@ mk = MnemonicKey(mnemonic=NEBULA_MK)
 wallet = terra.wallet(mk)
 
 acc_address = wallet.key.acc_address
-
-
