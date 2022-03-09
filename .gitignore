@@ -10,6 +10,8 @@ share/
 Scripts/pywin32_testall.py
 Scripts/pywin32_postinstall.py
 Scripts/activate
+Scripts/bip32gen
+Scripts/bip32gen.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -38,7 +40,6 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-Scripts/bip32gen
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
