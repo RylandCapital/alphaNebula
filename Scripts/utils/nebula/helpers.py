@@ -34,7 +34,7 @@ class Cluster:
     #returns config json of cluster
     def config(self):
         req = requests.get(
-            ContractInfo().chain_url + r'wasm/contracts/{0}/store?query_msg=%7B"config":%7B%7D%7D'.format(cluster_contract)
+            ContractInfo().chain_url + r'wasm/contracts/{0}/store?query_msg=%7B"config":%7B%7D%7D'.format(self.cluster_contract)
         ).json()
         return req['result']['config']
 
