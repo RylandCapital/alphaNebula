@@ -49,7 +49,9 @@ type = None
 #run time and sales
 while True:
     dex1 = requests.get('https://fcd.terra.dev/wasm/contracts/{0}/store?query_msg=%7B%22pool%22:%7B%7D%7D'.format(dex)).json()
+    #get theo price no adjustments
     raw_price = float(dex1['result']['assets'][0]['amount'])/float(dex1['result']['assets'][1]['amount'])
+    #check if any trades were made in last 1 second if not pass
     if raw_price!=raw_price_last:
 
         amount0change = float(dex1['result']['assets'][0]['amount'])-amount0_last
@@ -75,6 +77,7 @@ while True:
         print('actual_traded_price: {0}'.format(last_trade))
         print('market_impact: {0}%\n'.format(last_trade/raw_price-1))
 
+        #collect expected bid offer for next trade based off current theo
         print("EXPECTED BID OFFER FOR NEXT TRADE")
         print('Current Theo Bid/Offer: {0}\n\n\n'.format([
             raw_price*(1+theo_fee),
