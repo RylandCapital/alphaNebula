@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 import numpy as np
 
-from Scripts.utils.nebula.contract_info import ContractInfo
+from Scripts.utils.contract_info import ContractInfo
 
 
 
@@ -10,15 +10,18 @@ class Cluster:
     
     '''intended to help query cluster information to facilitate further actions'''
 
-    def __init__(self, cluster_contract):
+    def __init__(self, cluster_contract, net='testnet'):
         self.cluster_contract = cluster_contract
-        pass
+        self.net = net
 
     #returns target msg and cluster_state msg into pandas df ready for calcs
     def inventory(self):
         req = requests.get(
-            ContractInfo().chain_url + r'wasm/contracts/{0}/store?query_msg=%7B"cluster_state":%7B%7D%7D'.format(self.cluster_contract)
-        ).json()
+            ContractInfo().clusters[self.net]['chain_url'] + 
+            r'wasm/contracts/{0}/store?query_msg=%7B"cluster_state":%7B%7D%7D'.format(
+                self.cluster_contract
+                )
+            ).json()
         asset_types = [list(i['info'].keys())[0] for i in req['result']['target']]
         df = pd.DataFrame.from_dict(
             req['result']['target']
@@ -41,8 +44,11 @@ class Cluster:
     #returns df of cluster target msg
     def target(self): 
         req = requests.get(
-            ContractInfo().chain_url + r'wasm/contracts/{0}/store?query_msg=%7B"target":%7B%7D%7D'.format(self.cluster_contract)
-        ).json()
+            ContractInfo().clusters[self.net]['chain_url'] + 
+            r'wasm/contracts/{0}/store?query_msg=%7B"target":%7B%7D%7D'.format(
+                self.cluster_contract
+                )
+            ).json()
         asset_types = [list(i['info'].keys())[0] for i in req['result']['target']]
         df = pd.DataFrame.from_dict(
             req['result']['target']
@@ -62,8 +68,11 @@ class Cluster:
     #returns config json of cluster
     def config(self):
         req = requests.get(
-            ContractInfo().chain_url + r'wasm/contracts/{0}/store?query_msg=%7B"config":%7B%7D%7D'.format(self.cluster_contract)
-        ).json()
+            ContractInfo().clusters[self.net]['chain_url'] + 
+            r'wasm/contracts/{0}/store?query_msg=%7B"config":%7B%7D%7D'.format(
+                self.cluster_contract
+                )
+            ).json()
         return req['result']['config']
 
     
