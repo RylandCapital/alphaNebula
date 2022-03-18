@@ -12,6 +12,8 @@ from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.client.lcd.api.tx import CreateTxOptions
 from terra_sdk.core.fee import Fee
 
+from Scripts.utils.contract_info import ContractInfo
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -37,11 +39,11 @@ def luna_ust_arb(dex_one='ts', dex_two='astro', theo_fee1=.00305, theo_fee2 =.00
     run = True
     raw_price_last1 = 0
     raw_price_last2 = 0
-    positives = [{}] #collect positive timstamps as test 
+    positives = [{}] #collect positive timstamps as test
     while run == True:
 
         try:
-        
+
             now = dt.datetime.now()
             dex1 = requests.get(
                 "https://fcd.terra.dev/wasm/contracts/{0}/store?query_msg=%7B%22pool%22:%7B%7D%7D".format(str(addys[dex_one]))
@@ -70,7 +72,7 @@ def luna_ust_arb(dex_one='ts', dex_two='astro', theo_fee1=.00305, theo_fee2 =.00
             print('DEX1 Bid/Offer: {0}'.format(dex1_bid_ask))
             print('DEX2 Bid/Offer: {0}\n'.format(dex2_bid_ask))
 
-            #dex 1 bid/ dex 2 offer 
+            #dex 1 bid/ dex 2 offer
             buy1sell2 = dex2_bid_ask[1]/dex1_bid_ask[0]-1
             buy2sell1 = dex1_bid_ask[1]/dex2_bid_ask[0]-1
             print('BUY DEX1 SELL DEX2 ARB - PREDICTED: {0}'.format(buy1sell2))
@@ -93,7 +95,7 @@ def luna_ust_arb(dex_one='ts', dex_two='astro', theo_fee1=.00305, theo_fee2 =.00
                     bank = client.bank.balance(wallet.key.acc_address)[0]
                     amounts = {
                         'uusd': bank['uusd'].amount,
-                        'uluna': bank['uluna'].amount       
+                        'uluna': bank['uluna'].amount
                     }
 
 
@@ -123,15 +125,15 @@ def luna_ust_arb(dex_one='ts', dex_two='astro', theo_fee1=.00305, theo_fee2 =.00
                         )
                     buy_result = client.tx.broadcast(tx)
 
-                    
+
                     #construct sell tx
 
                     #add both buy and sell side txs for if dex2 is purchase dex
 
-                    
+
                     #sleep to make avoid dups/rapid fire
                     time.sleep(100)
-                
+
             time.sleep(1)
 
         except:
