@@ -169,7 +169,7 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
                                     "offer_asset": {
                                     "amount": "{0}".format(
 
-                                        int(bank.loc['uusd','amount']*pcttrade / dex1_bid_ask[1]) #using $ value of UST used to buy / dex 1 anticapipated offer price 
+                                        int(bank.loc['uusd','amount']*pcttrade / dex1_bid_ask[0]) #using $ value of UST used to buy / dex 1 anticapipated offer price 
 
                                         ), 
                                     "info": {
@@ -180,7 +180,7 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
                                     }
                                 }
                                 },
-                            { 'uluna': int(bank.loc['uusd','amount']*pcttrade / dex1_bid_ask[1]) }
+                            { 'uluna': int(bank.loc['uusd','amount']*pcttrade / dex1_bid_ask[0]) }
                             )
                     ]
                     
@@ -214,6 +214,7 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
                     #sleep to make avoid dups/rapid fire
                         #honestly just a safety measure, theoretically you might have back to back 
                         #opportunities to arb, but for now lets sleep for a little and then look for more
+                    print('BOT TIRED, BOT SLEEPETH')
                     time.sleep(60)
 
             #1 second increment between DEX queries looking for arbitrade situations
@@ -222,6 +223,7 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
         # any exceptions lets shut down for now and analyze mistakes
         except:
             return [positives, post_banks, theodf]
+            
 
 
 
