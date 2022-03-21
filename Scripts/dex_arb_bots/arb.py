@@ -47,6 +47,7 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
     raw_price_last2 = 0
     positives = [{}] #collect positive timstamps as test
     post_banks = [pd.DataFrame([])]
+    theodf = pd.DataFrame([], columns=['dex1_theo', 'dex2_theo'])
     while run == True:
 
         try:
@@ -89,6 +90,10 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
             print('BUY DEX2 SELL DEX1 ARB - PREDICTED: {0}\n\n\n'.format(buy2sell1))
 
             #collect for analysis
+            #theos
+            theodf.loc[now, 'dex1_theo'] = raw_price1
+            theodf.loc[now, 'dex2_theo'] = raw_price2
+            #positive arb opportunities 
             if (buy1sell2>0) | (buy2sell1>0):
                 positives.append({
                     'datetime':'now',
