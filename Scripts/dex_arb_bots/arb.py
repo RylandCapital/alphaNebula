@@ -88,6 +88,14 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
             print('BUY DEX1 SELL DEX2 ARB - PREDICTED: {0}'.format(buy1sell2))
             print('BUY DEX2 SELL DEX1 ARB - PREDICTED: {0}\n\n\n'.format(buy2sell1))
 
+            #collect for analysis
+            if (buy1sell2>0) | (buy2sell1>0):
+                positives.append({
+                    'datetime':'now',
+                    'buy1sell2':buy1sell2,
+                    'buy2sell1':buy2sell1,
+                })
+
             #update lasts
             raw_price_last1 = raw_price1
             raw_price_last2 = raw_price2
@@ -194,9 +202,9 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
             time.sleep(1)
 
         # any exceptions lets shut down for now and analyze mistakes
-        except Exception as e:
-            print(e)
+        except:
             return [positives, post_banks]
+
 
 
 if __name__ == "__main__":
@@ -214,5 +222,5 @@ if __name__ == "__main__":
         theo_fee2 =.00205,
         client=terra,
         walletkey=NEBULA_MK,
-        thresh=.002,
+        thresh=.0015,
         pcttrade=.50)
