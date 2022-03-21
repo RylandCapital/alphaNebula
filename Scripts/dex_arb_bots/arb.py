@@ -34,8 +34,8 @@ Using luna-ust as asset.
 '''theo fee one and two must be adjusted depending on dex!!!'''
 '''market impact calc will be added using x*y = (x+deltaX)*(y+deltaY) where deltaX and deltaY
 are the amounts of each asset we are depositing and removing'''
-def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fee2 =.00205,
-                 client=None, walletkey=None, thresh=.002, pcttrade=.75):
+def luna_ust_arb(dex_one='terraswap', dex_two='astro', denom_buy='uusd', denom_sell='uluna',
+     theo_fee1=.00305, theo_fee2 =.00205, client=None, walletkey=None, thresh=.002, pcttrade=.75):
 
     #inputs
     raw_price_last1 = 0
@@ -70,10 +70,18 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
                 'https://fcd.terra.dev/wasm/contracts/{0}/store?query_msg=%7B%22pool%22:%7B%7D%7D'.format(str(dex2_address))
                 ).json()
 
+            # convert to df with denom index. this solves asset order difference between dexes
+            dex1 = pd.DataFrame(dex1['result']['assets'])
+            dex1['info'] = dex1['info'].apply(lambda x: x['native_token']['denom'])
+            dex2 = pd.DataFrame(dex2['result']['assets'])
+            dex2['info'] = dex2['info'].apply(lambda x: x['native_token']['denom'])
+            #set index as info column, providing denom as dataframe index
+            dex1.set_index('info', inplace=True)
+            dex2.set_index('info', inplace=True)
+
             #get theo price no adjustments
-                # using [0] and [1] doesnt work for all dexes, sometimes they are flipped so need to address that.
-            raw_price1 = float(dex1['result']['assets'][0]['amount'])/float(dex1['result']['assets'][1]['amount'])
-            raw_price2 = float(dex2['result']['assets'][0]['amount'])/float(dex2['result']['assets'][1]['amount'])
+            raw_price1 = float(dex1.loc[denom_buy])/float(dex1.loc[denom_sell])
+            raw_price2 = float(dex2.loc[denom_buy])/float(dex2.loc[denom_sell])
 
             #collect expected bid offer for next trade based off current theo
             dex1_bid_ask = [
@@ -129,15 +137,19 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
                         mnemonic=walletkey
                         )
                     # Gets (what seems random) connection reset error, retrying seems to fix. 
-                        # ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+                        # FIXES ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
                     try:
                         wallet = client.wallet(mk)
+                        # Grab bank and format in a way that does error out whether there are 2 or 100 currencies.
+                        bank = pd.DataFrame(
+                            client.bank.balance(wallet.key.acc_address)[0].to_data()
+                        ).set_index('denom').astype(int)
                     except:
                         wallet = client.wallet(mk)
-                    # Grab bank and format in a way that does error out whether there are 2 or 100 currencies.
-                    bank = pd.DataFrame(
-                        client.bank.balance(wallet.key.acc_address)[0].to_data()
+                        bank = pd.DataFrame(
+                            client.bank.balance(wallet.key.acc_address)[0].to_data()
                         ).set_index('denom').astype(int)
+                    
                    
                     msgs = [
                     MsgExecuteContract(
@@ -148,16 +160,16 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
                                     "belief_price": "{0}".format(raw_price1),
                                     "max_spread": "0.001",
                                     "offer_asset": {
-                                    "amount": "{0}".format(int(bank.loc['uusd','amount']*pcttrade)),
+                                    "amount": "{0}".format(int(bank.loc[denom_buy,'amount']*pcttrade)),
                                     "info": {
                                         "native_token": {
-                                        "denom": "uusd"
+                                        "denom": "{0}".format(denom_buy)
                                         }
                                     }
                                     }
                                 }
                                 },
-                            { 'uusd': int(bank.loc['uusd','amount']*pcttrade) }
+                            { denom_buy: int(bank.loc[denom_buy,'amount']*pcttrade) }
                             ),
                     MsgExecuteContract(
                                 wallet.key.acc_address,
@@ -169,18 +181,18 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
                                     "offer_asset": {
                                     "amount": "{0}".format(
 
-                                        int(bank.loc['uusd','amount']*pcttrade / dex1_bid_ask[0]) #using $ value of UST used to buy / dex 1 anticapipated offer price 
+                                        int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[0]) #using $ value of UST used to buy / dex 1 anticapipated offer price 
 
                                         ), 
                                     "info": {
                                         "native_token": {
-                                        "denom": "uluna"
+                                        "denom": "{0}".format(denom_sell)
                                         }
                                     }
                                     }
                                 }
                                 },
-                            { 'uluna': int(bank.loc['uusd','amount']*pcttrade / dex1_bid_ask[0]) }
+                            { denom_sell: int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[0]) }
                             )
                     ]
                     
@@ -238,6 +250,8 @@ if __name__ == "__main__":
     data = luna_ust_arb(
         dex_one='terraswap',
         dex_two='astro',
+        denom_buy='uusd',
+        denom_sell='uluna',
         theo_fee1=.00305,
         theo_fee2 =.00205,
         client=terra,
