@@ -47,7 +47,15 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
     raw_price_last2 = 0
     positives = [{}] #collect positive timstamps as test
     post_banks = [pd.DataFrame([])]
-    theodf = pd.DataFrame([], columns=['dex1_theo', 'dex2_theo'])
+    theodf = pd.DataFrame([], columns=[
+        'dex1_theo',
+        'dex2_theo',
+        'dex1_bid',
+        'dex1_offer',
+        'dex2_bid',
+        'dex2_offer',
+        ]
+    )
     while run == True:
 
         try:
@@ -63,7 +71,7 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
                 ).json()
 
             #get theo price no adjustments
-            # using [0] and [1] doesnt work for all dexes, sometimes they are flipped so need to address that.
+                # using [0] and [1] doesnt work for all dexes, sometimes they are flipped so need to address that.
             raw_price1 = float(dex1['result']['assets'][0]['amount'])/float(dex1['result']['assets'][1]['amount'])
             raw_price2 = float(dex2['result']['assets'][0]['amount'])/float(dex2['result']['assets'][1]['amount'])
 
@@ -90,10 +98,15 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
             print('BUY DEX2 SELL DEX1 ARB - PREDICTED: {0}\n\n\n'.format(buy2sell1))
 
             #collect for analysis
-            #theos
+                #theos
             theodf.loc[now, 'dex1_theo'] = raw_price1
             theodf.loc[now, 'dex2_theo'] = raw_price2
-            #positive arb opportunities 
+            theodf.loc[now, 'dex1_bid'] = dex1_bid_ask[0]
+            theodf.loc[now, 'dex1_offer'] = dex1_bid_ask[1]
+            theodf.loc[now, 'dex2_bid'] = dex2_bid_ask[0]
+            theodf.loc[now, 'dex2_offer'] = dex2_bid_ask[1]
+
+                #positive arb opportunities 
             if (buy1sell2>0) | (buy2sell1>0):
                 positives.append({
                     'datetime':'now',
@@ -116,7 +129,7 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
                         mnemonic=walletkey
                         )
                     # Gets (what seems random) connection reset error, retrying seems to fix. 
-                    # ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+                        # ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
                     try:
                         wallet = client.wallet(mk)
                     except:
@@ -196,11 +209,11 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
 
 
                     #add both buy and sell side txs for if dex2 is purchase dex (this isnt complete)
-                    #currently just looking for dex 1 buys for now while testing.
+                        #currently just looking for dex 1 buys for now while testing.
 
                     #sleep to make avoid dups/rapid fire
-                    #honestly just a safety measure, theoretically you might have back to back 
-                    #opportunities to arb, but for now lets sleep for a little and then look for more
+                        #honestly just a safety measure, theoretically you might have back to back 
+                        #opportunities to arb, but for now lets sleep for a little and then look for more
                     time.sleep(60)
 
             #1 second increment between DEX queries looking for arbitrade situations
@@ -208,7 +221,7 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', theo_fee1=.00305, theo_fe
 
         # any exceptions lets shut down for now and analyze mistakes
         except:
-            return [positives, post_banks]
+            return [positives, post_banks, theodf]
 
 
 
