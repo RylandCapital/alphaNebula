@@ -4,7 +4,7 @@ from terra_sdk.key.mnemonic import MnemonicKey
 from typing import List
 import os
 
-from Scripts.utils.terra_client import TerraClient
+from Scripts.utils.terra.terra_client import TerraClient
 
 
 class TerraWallet:
@@ -20,10 +20,6 @@ class TerraWallet:
         return self.wallet.key.acc_address
 
     def send_execute_tx(self, execute_msgs: List) -> str:
-        execute_tx = self.wallet.create_and_sign_tx(
-            msgs=execute_msgs,
-            gas_prices="0.15uusd",
-            gas_adjustment="1.4",
-        )
+        execute_tx = self.wallet.create_and_sign_tx(msgs=execute_msgs, gas_prices="0.15uusd", gas_adjustment="1.4",)
         execute_tx_result = self.client.client.tx.broadcast(execute_tx)
         return execute_tx_result.txhash
