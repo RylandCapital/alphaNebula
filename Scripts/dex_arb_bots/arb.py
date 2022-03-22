@@ -85,20 +85,20 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', denom_buy='uusd', denom_s
 
             #collect expected bid offer for next trade based off current theo
             dex1_bid_ask = [
-                raw_price1*(1+theo_fee1),
-                raw_price1*(1-theo_fee1)
+                raw_price1*(1-theo_fee1), #bid
+                raw_price1*(1+theo_fee1)  #offer
                 ]
             dex2_bid_ask = [
-                raw_price2*(1+theo_fee2),
-                raw_price2*(1-theo_fee2)
+                raw_price2*(1-theo_fee2),  #bid
+                raw_price2*(1+theo_fee2)   #offer
                 ]
             
             #looking for bid offer crosses
-            buy1sell2 = dex2_bid_ask[1]/dex1_bid_ask[0]-1
-            buy2sell1 = dex1_bid_ask[1]/dex2_bid_ask[0]-1
+            buy1sell2 = dex2_bid_ask[0]/dex1_bid_ask[1]-1 #bid-dex2/offer-dex1
+            buy2sell1 = dex1_bid_ask[0]/dex2_bid_ask[1]-1 #bid-dex1/offer-dex2
 
-            #only print data if anything has changed, aka trades have occured in pool to avoid clutter
-            if (raw_price_last1 != raw_price1) | (raw_price_last1 != raw_price1):
+            #only/collect print data if anything has changed, aka trades have occured in pool to avoid clutter
+            if (raw_price_last1 != raw_price1) | (raw_price_last2 != raw_price2):
                 print("DEX1 THEO: {0}".format(raw_price1))
                 print("DEX2 THEO: {0}\n".format(raw_price2))
                 print("EXPECTED ARB BID OFFERS:{0}".format(now))
@@ -107,59 +107,65 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', denom_buy='uusd', denom_s
                 print('BUY DEX1 SELL DEX2 ARB - PREDICTED: {0}'.format(buy1sell2))
                 print('BUY DEX2 SELL DEX1 ARB - PREDICTED: {0}\n\n\n'.format(buy2sell1))
 
-            #collect for analysis
-                #theos
-            theodf.loc[now, 'dex1_theo'] = raw_price1
-            theodf.loc[now, 'dex2_theo'] = raw_price2
-            theodf.loc[now, 'dex1_bid'] = dex1_bid_ask[0]
-            theodf.loc[now, 'dex1_offer'] = dex1_bid_ask[1]
-            theodf.loc[now, 'dex2_bid'] = dex2_bid_ask[0]
-            theodf.loc[now, 'dex2_offer'] = dex2_bid_ask[1]
+                #collect for analysis
+                    #theos
+                theodf.loc[now, 'dex1_theo'] = raw_price1
+                theodf.loc[now, 'dex2_theo'] = raw_price2
+                theodf.loc[now, 'dex1_bid'] = dex1_bid_ask[0]
+                theodf.loc[now, 'dex1_offer'] = dex1_bid_ask[1]
+                theodf.loc[now, 'dex2_bid'] = dex2_bid_ask[0]
+                theodf.loc[now, 'dex2_offer'] = dex2_bid_ask[1]
 
-                #positive arb opportunities 
-            if (buy1sell2>0) | (buy2sell1>0):
-                positives.append({
-                    'datetime':'now',
-                    'buy1sell2':buy1sell2,
-                    'buy2sell1':buy2sell1,
-                })
+                    #positive arb opportunities 
+                if (buy1sell2>0) | (buy2sell1>0):
+                    positives.append({
+                        'datetime':'now',
+                        'buy1sell2':buy1sell2,
+                        'buy2sell1':buy2sell1,
+                    })
 
             #update lasts
             raw_price_last1 = raw_price1
             raw_price_last2 = raw_price2
 
-            #make trades if applicable
+            #make trades if applicable this makes sure trades are fired on start of algo
             if (raw_price_last1!=0) | (raw_price_last2!=0):
 
                 #if dex1 is the buy side dex send buy message to dex1, sell to dex2
                 if (buy1sell2>thresh):
-
-                    #connect to wallet and get updated bank
-                    mk = MnemonicKey(
-                        mnemonic=walletkey
-                        )
+                    print('Threshold met')
                     # Gets (what seems random) connection reset error, retrying seems to fix. 
                         # FIXES ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
                     try:
+                        print('I am about to trade')
+                        mk = MnemonicKey(
+                        mnemonic=walletkey
+                        )
                         wallet = client.wallet(mk)
                         # Grab bank and format in a way that does error out whether there are 2 or 100 currencies.
                         bank = pd.DataFrame(
                             client.bank.balance(wallet.key.acc_address)[0].to_data()
                         ).set_index('denom').astype(int)
-                    except:
+                    except Exception as e:
+                        print('I got an error...')
+                        print(e)
+                        print('.................')
+                        print('I trying to trade agian.')
+                        mk = MnemonicKey(
+                        mnemonic=walletkey
+                        )
                         wallet = client.wallet(mk)
                         bank = pd.DataFrame(
                             client.bank.balance(wallet.key.acc_address)[0].to_data()
                         ).set_index('denom').astype(int)
-                    
-                   
+                                   
                     msgs = [
                     MsgExecuteContract(
                                 wallet.key.acc_address,
                                 dex1_address,
                                 {
                                 "swap": {
-                                    "belief_price": "{0}".format(raw_price1),
+                                    "belief_price": "{0}".format(dex1_bid_ask[1]), #hit the offer on dex1
                                     "max_spread": "0.001",
                                     "offer_asset": {
                                     "amount": "{0}".format(int(bank.loc[denom_buy,'amount']*pcttrade)),
@@ -178,12 +184,12 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', denom_buy='uusd', denom_s
                                 dex2_address,
                                 {
                                 "swap": {
-                                    "belief_price": "{0}".format(raw_price2),
+                                    "belief_price": "{0}".format(dex2_bid_ask[0]),
                                     "max_spread": "0.001",
                                     "offer_asset": {
                                     "amount": "{0}".format(
 
-                                        int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[0]) #using $ value of UST used to buy / dex 1 anticapipated offer price 
+                                        int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[1]) #using $ value of UST used to buy / dex 1 predicted offer price offer price 
 
                                         ), 
                                     "info": {
@@ -194,7 +200,7 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', denom_buy='uusd', denom_s
                                     }
                                 }
                                 },
-                            { denom_sell: int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[0]) }
+                            { denom_sell: int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[1]) }
                             )
                     ]
                     
@@ -228,15 +234,17 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', denom_buy='uusd', denom_s
                     #sleep to make avoid dups/rapid fire
                         #honestly just a safety measure, theoretically you might have back to back 
                         #opportunities to arb, but for now lets sleep for a little and then look for more
-                    print('BOT TIRED, BOT SLEEPETH')
+                    print('Sleeping for 60 seconds ...')
                     time.sleep(60)
 
             #1 second increment between DEX queries looking for arbitrade situations
             time.sleep(1)
 
         # any exceptions lets shut down for now and analyze mistakes
-        except:
-            return [positives, post_banks, theodf]
+        except Exception as e:
+            print(e)
+            
+#            return [positives, post_banks, theodf]
             
 
 
@@ -250,7 +258,7 @@ if __name__ == "__main__":
     )
 
     data = luna_ust_arb(
-        dex_one='terraswap',
+        dex_one='loop',
         dex_two='astro',
         denom_buy='uusd',
         denom_sell='uluna',
@@ -258,5 +266,5 @@ if __name__ == "__main__":
         theo_fee2 =.00205,
         client=terra,
         walletkey=NEBULA_MK,
-        thresh=.0015,
+        thresh=.001,
         pcttrade=.50)
