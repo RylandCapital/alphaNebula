@@ -26,6 +26,7 @@ class ContractInfo:
             },
             "loop": {
                 # docs: https://docs.loop.markets/loop-finance/
-                "router": {}
+                "router": {},
+                "luna-ust": {"mainnet": "terra1sgu6yca6yjk0a34l86u6ju4apjcd6refwuhgzv"},
             },
         }

@@ -2,19 +2,21 @@ import requests
 import time
 import datetime as dt
 import pandas as pd
+import json
 import os
 
 from terra_sdk.client.lcd import LCDClient
+from terra_sdk.core.bank import MsgSend
+from terra_sdk.core.coins import Coins
 from terra_sdk.key.mnemonic import MnemonicKey
 from terra_sdk.core.wasm import MsgExecuteContract
 
 from terra_sdk.client.lcd.api.tx import CreateTxOptions
+from terra_sdk.core.fee import Fee
 
 from Scripts.utils.contract_info import ContractInfo
 
 from dotenv import load_dotenv
-
-from Scripts.utils.terra.terra_wallet import TerraWallet
 
 load_dotenv()
 
@@ -36,6 +38,8 @@ are the amounts of each asset we are depositing and removing"""
 def luna_ust_arb(
     dex_one="terraswap",
     dex_two="astro",
+    denom_buy="uusd",
+    denom_sell="uluna",
     theo_fee1=0.00305,
     theo_fee2=0.00205,
     client=None,
@@ -54,6 +58,7 @@ def luna_ust_arb(
     raw_price_last2 = 0
     positives = [{}]  # collect positive timstamps as test
     post_banks = [pd.DataFrame([])]
+    theodf = pd.DataFrame([], columns=["dex1_theo", "dex2_theo", "dex1_bid", "dex1_offer", "dex2_bid", "dex2_offer",])
     while run == True:
 
         try:
@@ -72,26 +77,51 @@ def luna_ust_arb(
                 )
             ).json()
 
+            # convert to df with denom index. this solves asset order difference between dexes
+            dex1 = pd.DataFrame(dex1["result"]["assets"])
+            dex1["info"] = dex1["info"].apply(lambda x: x["native_token"]["denom"])
+            dex2 = pd.DataFrame(dex2["result"]["assets"])
+            dex2["info"] = dex2["info"].apply(lambda x: x["native_token"]["denom"])
+            # set index as info column, providing denom as dataframe index
+            dex1.set_index("info", inplace=True)
+            dex2.set_index("info", inplace=True)
+
             # get theo price no adjustments
-            # using [0] and [1] doesnt work for all dexes, sometimes they are flipped so need to address that.
-            raw_price1 = float(dex1["result"]["assets"][0]["amount"]) / float(dex1["result"]["assets"][1]["amount"])
-            raw_price2 = float(dex2["result"]["assets"][0]["amount"]) / float(dex2["result"]["assets"][1]["amount"])
+            raw_price1 = float(dex1.loc[denom_buy]) / float(dex1.loc[denom_sell])
+            raw_price2 = float(dex2.loc[denom_buy]) / float(dex2.loc[denom_sell])
 
             # collect expected bid offer for next trade based off current theo
             dex1_bid_ask = [raw_price1 * (1 + theo_fee1), raw_price1 * (1 - theo_fee1)]
             dex2_bid_ask = [raw_price2 * (1 + theo_fee2), raw_price2 * (1 - theo_fee2)]
 
-            print("DEX1 THEO: {0}".format(raw_price1))
-            print("DEX2 THEO: {0}\n".format(raw_price2))
-            print("EXPECTED ARB BID OFFERS:{0}".format(now))
-            print("DEX1 Bid/Offer: {0}".format(dex1_bid_ask))
-            print("DEX2 Bid/Offer: {0}\n".format(dex2_bid_ask))
-
             # looking for bid offer crosses
             buy1sell2 = dex2_bid_ask[1] / dex1_bid_ask[0] - 1
             buy2sell1 = dex1_bid_ask[1] / dex2_bid_ask[0] - 1
-            print("BUY DEX1 SELL DEX2 ARB - PREDICTED: {0}".format(buy1sell2))
-            print("BUY DEX2 SELL DEX1 ARB - PREDICTED: {0}\n\n\n".format(buy2sell1))
+
+            # only print data if anything has changed, aka trades have occured in pool to avoid clutter
+            if (raw_price_last1 != raw_price1) | (raw_price_last1 != raw_price1):
+                print("DEX1 THEO: {0}".format(raw_price1))
+                print("DEX2 THEO: {0}\n".format(raw_price2))
+                print("EXPECTED ARB BID OFFERS:{0}".format(now))
+                print("DEX1 Bid/Offer: {0}".format(dex1_bid_ask))
+                print("DEX2 Bid/Offer: {0}\n".format(dex2_bid_ask))
+                print("BUY DEX1 SELL DEX2 ARB - PREDICTED: {0}".format(buy1sell2))
+                print("BUY DEX2 SELL DEX1 ARB - PREDICTED: {0}\n\n\n".format(buy2sell1))
+
+            # collect for analysis
+            # theos
+            theodf.loc[now, "dex1_theo"] = raw_price1
+            theodf.loc[now, "dex2_theo"] = raw_price2
+            theodf.loc[now, "dex1_bid"] = dex1_bid_ask[0]
+            theodf.loc[now, "dex1_offer"] = dex1_bid_ask[1]
+            theodf.loc[now, "dex2_bid"] = dex2_bid_ask[0]
+            theodf.loc[now, "dex2_offer"] = dex2_bid_ask[1]
+
+            # positive arb opportunities
+            if (buy1sell2 > 0) | (buy2sell1 > 0):
+                positives.append(
+                    {"datetime": "now", "buy1sell2": buy1sell2, "buy2sell1": buy2sell1,}
+                )
 
             # update lasts
             raw_price_last1 = raw_price1
@@ -106,17 +136,22 @@ def luna_ust_arb(
                     # connect to wallet and get updated bank
                     mk = MnemonicKey(mnemonic=walletkey)
                     # Gets (what seems random) connection reset error, retrying seems to fix.
-                    # ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+                    # FIXES ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
                     try:
                         wallet = client.wallet(mk)
+                        # Grab bank and format in a way that does error out whether there are 2 or 100 currencies.
+                        bank = (
+                            pd.DataFrame(client.bank.balance(wallet.key.acc_address)[0].to_data())
+                            .set_index("denom")
+                            .astype(int)
+                        )
                     except:
                         wallet = client.wallet(mk)
-                    # Grab bank and format in a way that does error out whether there are 2 or 100 currencies.
-                    bank = (
-                        pd.DataFrame(client.bank.balance(wallet.key.acc_address)[0].to_data())
-                        .set_index("denom")
-                        .astype(int)
-                    )
+                        bank = (
+                            pd.DataFrame(client.bank.balance(wallet.key.acc_address)[0].to_data())
+                            .set_index("denom")
+                            .astype(int)
+                        )
 
                     msgs = [
                         MsgExecuteContract(
@@ -127,12 +162,12 @@ def luna_ust_arb(
                                     "belief_price": "{0}".format(raw_price1),
                                     "max_spread": "0.001",
                                     "offer_asset": {
-                                        "amount": "{0}".format(int(bank.loc["uusd", "amount"] * pcttrade)),
-                                        "info": {"native_token": {"denom": "uusd"}},
+                                        "amount": "{0}".format(int(bank.loc[denom_buy, "amount"] * pcttrade)),
+                                        "info": {"native_token": {"denom": "{0}".format(denom_buy)}},
                                     },
                                 }
                             },
-                            {"uusd": int(bank.loc["uusd", "amount"] * pcttrade)},
+                            {denom_buy: int(bank.loc[denom_buy, "amount"] * pcttrade)},
                         ),
                         MsgExecuteContract(
                             wallet.key.acc_address,
@@ -144,14 +179,14 @@ def luna_ust_arb(
                                     "offer_asset": {
                                         "amount": "{0}".format(
                                             int(
-                                                bank.loc["uusd", "amount"] * pcttrade / dex1_bid_ask[1]
+                                                bank.loc[denom_buy, "amount"] * pcttrade / dex1_bid_ask[0]
                                             )  # using $ value of UST used to buy / dex 1 anticapipated offer price
                                         ),
-                                        "info": {"native_token": {"denom": "uluna"}},
+                                        "info": {"native_token": {"denom": "{0}".format(denom_sell)}},
                                     },
                                 }
                             },
-                            {"uluna": int(bank.loc["uusd", "amount"] * pcttrade / dex1_bid_ask[1])},
+                            {denom_sell: int(bank.loc[denom_buy, "amount"] * pcttrade / dex1_bid_ask[0])},
                         ),
                     ]
 
@@ -181,15 +216,15 @@ def luna_ust_arb(
                     # sleep to make avoid dups/rapid fire
                     # honestly just a safety measure, theoretically you might have back to back
                     # opportunities to arb, but for now lets sleep for a little and then look for more
+                    print("BOT TIRED, BOT SLEEPETH")
                     time.sleep(60)
 
             # 1 second increment between DEX queries looking for arbitrade situations
             time.sleep(1)
 
         # any exceptions lets shut down for now and analyze mistakes
-        except Exception as e:
-            print(e)
-            return [positives, post_banks]
+        except:
+            return [positives, post_banks, theodf]
 
 
 if __name__ == "__main__":
@@ -197,17 +232,17 @@ if __name__ == "__main__":
     NEBULA_MK = os.getenv("NEBULA_MK")
 
     terra = LCDClient("https://lcd.terra.dev", "columbus-5")
-    print("Connecting")
-    terraWallet = TerraWallet(mnemonic=NEBULA_MK)
-    print("Terra Client", terraWallet.get_acc_address())
 
-    # data = luna_ust_arb(
-    #     dex_one="terraswap",
-    #     dex_two="astro",
-    #     theo_fee1=0.00305,
-    #     theo_fee2=0.00205,
-    #     client=terra,
-    #     walletkey=NEBULA_MK,
-    #     thresh=0.002,
-    #     pcttrade=0.50,
-    # )
+    data = luna_ust_arb(
+        dex_one="terraswap",
+        dex_two="astro",
+        denom_buy="uusd",
+        denom_sell="uluna",
+        theo_fee1=0.00305,
+        theo_fee2=0.00205,
+        client=terra,
+        walletkey=NEBULA_MK,
+        thresh=0.0015,
+        pcttrade=0.50,
+    )
+
