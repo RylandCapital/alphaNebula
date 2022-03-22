@@ -30,4 +30,4 @@ if __name__ == "__main__":
 
     terraWallet = TerraWallet(NEBULA_MK)
     logger.info("Connected to terra wallet {}".format(terraWallet.get_acc_address()))
-    logger_arb.info("Connected to terra wallet {}".format(terraWallet.get_acc_address()))
+    logger_arb.critical("Connected to terra wallet {}".format(terraWallet.get_acc_address()))

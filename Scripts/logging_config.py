@@ -3,16 +3,11 @@ LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "standard": {
-            "format": "%(asctime)s [%(levelname)s] %(message)s",
-            # 'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-            "datefmt": "%d-%m-%Y %H:%M:%S",
-        },
+        "standard": {"format": "%(asctime)s [%(levelname)s] %(message)s", "datefmt": "%d-%m-%Y %H:%M:%S",},
         "info_logger_format": {"format": "%(asctime)s %(message)s", "datefmt": "%d-%m-%Y %H:%M:%S",},
         "colored": {
             "()": "colorlog.ColoredFormatter",
-            # 'format': "%(asctime)s - %(name)s: %(log_color)s%(levelname)-4s%(reset)s %(blue)s%(message)s",
-            "format": "%(asctime)s - %(log_color)s%(levelname)-4s%(reset)s %(blue)s%(message)s",
+            "format": "%(asctime)s [%(filename)s] - %(log_color)s%(levelname)-4s%(reset)s %(blue)s%(message)s",
             "datefmt": "%d-%m-%Y %H:%M:%S",
         },
     },
@@ -49,7 +44,7 @@ LOGGING_CONFIG = {
     },
     "loggers": {
         "": {"handlers": ["default", "debug_console_handler"], "level": "INFO", "propagate": True,},
-        "arbstrat": {"handlers": ["arbstrat"], "level": "INFO", "propagate": False,},
+        "arbstrat": {"handlers": ["arbstrat"], "level": "INFO", "propagate": True,},
         "werkzeug": {"handlers": ["werkzeug"], "level": "INFO", "propagate": False,},
         "urllib3.connectionpool": {"level": "WARNING",},
     },
