@@ -234,7 +234,7 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', denom_buy='uusd', denom_s
                     #sleep to make avoid dups/rapid fire
                         #honestly just a safety measure, theoretically you might have back to back 
                         #opportunities to arb, but for now lets sleep for a little and then look for more
-                    print('Sleeping for 60 seconds ...')
+                    print('Sleeping for 60 seconds ...\n\n\n')
                     time.sleep(60)
 
             #1 second increment between DEX queries looking for arbitrade situations
@@ -266,5 +266,5 @@ if __name__ == "__main__":
         theo_fee2 =.00205,
         client=terra,
         walletkey=NEBULA_MK,
-        thresh=.001,
+        thresh=-.05,
         pcttrade=.50)
