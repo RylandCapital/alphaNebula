@@ -92,18 +92,20 @@ def luna_ust_arb(dex_one='terraswap', dex_two='astro', denom_buy='uusd', denom_s
                 raw_price2*(1+theo_fee2),
                 raw_price2*(1-theo_fee2)
                 ]
-
-            print("DEX1 THEO: {0}".format(raw_price1))
-            print("DEX2 THEO: {0}\n".format(raw_price2))
-            print("EXPECTED ARB BID OFFERS:{0}".format(now))
-            print('DEX1 Bid/Offer: {0}'.format(dex1_bid_ask))
-            print('DEX2 Bid/Offer: {0}\n'.format(dex2_bid_ask))
-
+            
             #looking for bid offer crosses
             buy1sell2 = dex2_bid_ask[1]/dex1_bid_ask[0]-1
             buy2sell1 = dex1_bid_ask[1]/dex2_bid_ask[0]-1
-            print('BUY DEX1 SELL DEX2 ARB - PREDICTED: {0}'.format(buy1sell2))
-            print('BUY DEX2 SELL DEX1 ARB - PREDICTED: {0}\n\n\n'.format(buy2sell1))
+
+            #only print data if anything has changed, aka trades have occured in pool to avoid clutter
+            if (raw_price_last1 != raw_price1) | (raw_price_last1 != raw_price1):
+                print("DEX1 THEO: {0}".format(raw_price1))
+                print("DEX2 THEO: {0}\n".format(raw_price2))
+                print("EXPECTED ARB BID OFFERS:{0}".format(now))
+                print('DEX1 Bid/Offer: {0}'.format(dex1_bid_ask))
+                print('DEX2 Bid/Offer: {0}\n'.format(dex2_bid_ask))            
+                print('BUY DEX1 SELL DEX2 ARB - PREDICTED: {0}'.format(buy1sell2))
+                print('BUY DEX2 SELL DEX1 ARB - PREDICTED: {0}\n\n\n'.format(buy2sell1))
 
             #collect for analysis
                 #theos
