@@ -1,5 +1,7 @@
 .vscode/
 
+logs/
+
 pyvenv.cfg
 *.exe
 *.bat
