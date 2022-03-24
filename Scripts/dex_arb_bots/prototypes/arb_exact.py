@@ -15,6 +15,7 @@ from terra_sdk.client.lcd.api.tx import CreateTxOptions
 from terra_sdk.core.fee import Fee
 
 from Scripts.utils.contract_info import ContractInfo
+from Scripts.utils.alerts import Discord
 
 from contextlib import redirect_stdout
 from printPrepender import PrintPrepender
@@ -28,6 +29,21 @@ load_dotenv()
 '''
 Arbitrage Bot - Prototype. 
 Using luna-ust as asset. 
+
+Fees = Gas_Fees + Tax **tax is now 0**
+Gas_Fees = Gas_Prices * Gas 
+           Gas_Prices = Cost Per Unit Gas e.g. .15uusd
+           Gas = Gas Requested e.g. 467,017 from txFinder
+           So .467017 * .15uusd = .070053 UST
+
+           the difference between gas_used and gas_requested is important.
+           what you send is gas requested, what actually is used is gas_used. 
+           the difference is not refunded so keeping gas_requested as tight
+           to gas used can be very beneficial.
+
+Example Tx to Understand Calcs Above = https://finder.extraterrestrial.money/mainnet/tx/A992EDC1F789E1C444B7D93408766E0022535C49E5FE7461B90BF3C5C84B570F
+Updated Gas Prices - https://fcd.terra.dev/v1/txs/gas_prices
+
 '''
 
 #dexs are ts, astro, and loop
@@ -37,8 +53,8 @@ Using luna-ust as asset.
 '''theo fee one and two must be adjusted depending on dex!!!'''
 '''market impact calc will be added using x*y = (x+deltaX)*(y+deltaY) where deltaX and deltaY
 are the amounts of each asset we are depositing and removing'''
-def luna_ust_arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_sell='uluna', algo_name='',
-    theo_fee1=.00305, theo_fee2 =.00205, client=None, walletkey=None, thresh=.002, pcttrade=.75):
+def luna_ust_arb(dex_buy='astro', dex_sell='terraswap', denom_buy='uusd', denom_sell='uluna', algo_name='astro-ts',
+    theo_fee1=.00205, theo_fee2 =.00305, client=None, walletkey=None, thresh=.0010, pcttrade=.75):
 
     #inputs
     raw_price_last1 = 0
@@ -70,10 +86,10 @@ def luna_ust_arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_
                 dex2_address = ContractInfo().dexes[dex_sell]['luna-ust']['mainnet']
 
                 dex1 = requests.get(
-                    "https://fcd.terra.dev/wasm/contracts/{0}/store?query_msg=%7B%22pool%22:%7B%7D%7D".format(str(dex1_address))
+                    "https://lcd.terra.dev/wasm/contracts/{0}/store?query_msg=%7B%22pool%22:%7B%7D%7D".format(str(dex1_address))
                     ).json()
                 dex2 = requests.get(
-                    'https://fcd.terra.dev/wasm/contracts/{0}/store?query_msg=%7B%22pool%22:%7B%7D%7D'.format(str(dex2_address))
+                    'https://lcd.terra.dev/wasm/contracts/{0}/store?query_msg=%7B%22pool%22:%7B%7D%7D'.format(str(dex2_address))
                     ).json()
 
                 # convert to df with denom index. this solves asset order difference between dexes
@@ -105,7 +121,7 @@ def luna_ust_arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_
 
                 #only/collect print data if anything has changed, aka trades have occured in pool to avoid clutter
                 if (raw_price_last1 != raw_price1) | (raw_price_last2 != raw_price2):
-                    print(
+                    print('{0} '.format(now) +
                         "ABS THEO RATIO: {0}% ".format(
                             round(abs(raw_price1/raw_price2-1)*100,4)) + 
                             '-' +
@@ -140,6 +156,18 @@ def luna_ust_arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_
 
                     #if dex1 is the buy side dex send buy message to dex1, sell to dex2
                     if (buy1sell2>thresh):
+
+                        #Webhook of luna-ust dex arb bot channel
+                        mUrl = Discord().webhooks['luna-ust']
+
+                        data = {
+                            "content": 'Attempting an arbitrage on ' +
+                            "{0}-{1}".format(denom_buy, denom_sell) +
+                            ' between {0}'.format(algo_name) +
+                            ' with a thresh of {0}'.format(thresh)
+                            }
+                        requests.post(mUrl, json=data)
+
                         # Gets (what seems random) connection reset error, retrying seems to fix. 
                             # FIXES ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
                         try:
@@ -208,7 +236,8 @@ def luna_ust_arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_
                         
                         tx = wallet.create_and_sign_tx(
                         CreateTxOptions(msgs=msgs,
-                        gas_prices="0.15uusd")
+                        gas_prices="0.15uusd"),
+                        gas_adjustment="1.2"
                             )
                         client.tx.broadcast(tx)
 
@@ -241,5 +270,15 @@ def luna_ust_arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_
 
             # any exceptions lets shut down for now and analyze mistakes
             except Exception as e:
-                print(e)       
-#               return [positives, post_banks, theodf]  #adding return data for analytics does work, need to get this info somehow.
+                #Webhook of luna-ust dex arb bot channel
+                mUrl = Discord().webhooks['luna-ust']
+
+                data = {
+                    "content": 'Exception handling received: ' +
+                    "{0}-{1}".format(denom_buy, denom_sell) +
+                    ' between {0}'.format(algo_name) +
+                    '\n Error: {0}'.format(e)
+                }
+                requests.post(mUrl, json=data)    
+                break  
+
