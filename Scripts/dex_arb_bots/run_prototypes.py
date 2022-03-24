@@ -252,9 +252,8 @@ if __name__ == "__main__":
      bot1,
      bot2,
      bot7,
-     bot8,
+     bot9,
      bot11,
-     bot12,
      bot13,
      bot14
      ]
