@@ -246,6 +246,40 @@ if __name__ == "__main__":
      } #pct of wallet to trade when arb is triggered)
     ) 
 
+    #mars-ust
+    bot15 = threading.Thread(target=arb, kwargs={
+        'dex_buy':'terraswap', #dex you are buying on 
+        'dex_sell':'astro', #dex you are selling on
+        'denom_buy':'uusd', #what you are using to buy 
+        'denom_sell':'terra12hgwnpupflfpuual532wgrxu2gjp0tcagzgx4n', #what you are selling
+        'algo_name':'mars-ust.ts_loop', #name for output
+        'pair':'lunax-luna', #name used for contractInfo and Discord hooks
+        'theo_fee1':.00305, #swap fee buy dex
+        'theo_fee2' :.00305, #sawp fee sell dex
+        'client':terra,
+        'walletkey':NEBULA_MK,
+        'thresh':.0035, #pct predicted arb to trigger trade
+        'pcttrade':.25
+     } #pct of wallet to trade when arb is triggered)
+    ) 
+
+    bot16 = threading.Thread(target=arb, kwargs={
+        'dex_buy':'astro', #dex you are buying on 
+        'dex_sell':'terraswap', #dex you are selling on
+        'denom_buy':'uluna', #what you are using to buy 
+        'denom_sell':'terra12hgwnpupflfpuual532wgrxu2gjp0tcagzgx4n', #what you are selling
+        'algo_name':'lunaxluna.loop_ts', #name for output
+        'pair':'lunax-luna', #name used for contractInfo and Discord hooks
+        'theo_fee1':.00305, #swap fee buy dex
+        'theo_fee2' :.00305, #sawp fee sell dex
+        'client':terra,
+        'walletkey':NEBULA_MK,
+        'thresh':.0035, #pct predicted arb to trigger trade
+        'pcttrade':.25
+     } #pct of wallet to trade when arb is triggered)
+    ) 
+
+
     
 
     bots = [
@@ -255,7 +289,9 @@ if __name__ == "__main__":
      bot9,
      bot11,
      bot13,
-     bot14
+     bot14,
+     bot15,
+     bot16
      ]
     
     for bot in bots:

@@ -25,7 +25,10 @@ class ContractInfo:
                 },
                 'lunax-luna': {
                     'mainnet':'terra1qswfc7hmmsnwf7f2nyyx843sug60urnqgz75zu'
-                }
+                },
+                'mars-ust': {
+                    'mainnet':'terra19wauh79y42u5vt62c5adt2g5h4exgh26t3rpds'
+                }  
                 
             },
             'terraswap': {
@@ -42,7 +45,10 @@ class ContractInfo:
                 },
                 'lunax-luna': {
                     'mainnet':'terra1zrzy688j8g6446jzd88vzjzqtywh6xavww92hy'
-                }       
+                },
+                'mars-ust': {
+                    'mainnet':'terra15sut89ms4lts4dd5yrcuwcpctlep3hdgeu729f'
+                }    
             },
             'loop': {
                 # docs: https://docs.loop.markets/loop-finance/

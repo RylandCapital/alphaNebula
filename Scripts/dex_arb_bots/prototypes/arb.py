@@ -53,8 +53,8 @@ Updated Gas Prices - https://fcd.terra.dev/v1/txs/gas_prices
 '''theo fee one and two must be adjusted depending on dex!!!'''
 '''market impact calc will be added using x*y = (x+deltaX)*(y+deltaY) where deltaX and deltaY
 are the amounts of each asset we are depositing and removing'''
-def arb(dex_buy='terraswap', dex_sell='loop', denom_buy='uusd', denom_sell='uluna', algo_name='ts-loop',
-    pair='luna-ust', theo_fee1=.00305, theo_fee2 =.00305, client=None, walletkey=None, thresh=.0035, pcttrade=.75):
+def arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_sell='terra12hgwnpupflfpuual532wgrxu2gjp0tcagzgx4n', algo_name='ts-astro',
+    pair='mars-ust', theo_fee1=.00305, theo_fee2 =.00305, client=None, walletkey=None, thresh=.0035, pcttrade=.75):
 
     #inputs
     raw_price_last1 = 0
