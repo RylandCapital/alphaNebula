@@ -27,7 +27,7 @@
   - Total PnL
 - Add Aps `BackgroundScheduler`
 - Add discord bot alert for position executor
-- Use ayncterra
+- Should run the bot at multiple places to let them compete ... 
 
 https://github.com/nebula-protocol/nebula-bots/blob/master/lambda/rewards-bot/lambda_function.py
 
@@ -61,8 +61,19 @@ class Transaction:
   async def run_task():
     if self.task:
       self.task()
+      # Update the time and the status 
+      result = await terra.tx.broadcast_sync()
+      result.is_tx_error()
+      result.code
     return
+
+    # Use sync: https://github.com/cosmos/cosmos-sdk/issues/4186
+  
 ```
+
+From Phong 
+- this is how we do it for our oms. we create records for the order so pre execution data like order amount, dex, belief price(price at that time), timestamp. then execution records so mostly same overlapping data exepct this has fees and actual trade value and tx timestamps.
+- ok see this is interesting. in my mind I was thinking saving the pools asset amounts every second would be fine, but that doesnt really give you trade data, only price data. there could have been 1 trade or 5 trades that changed the assets in the pool. so collecting txs from the contract, not asset amounts is the only way
 
 
 ## Known bugs 
