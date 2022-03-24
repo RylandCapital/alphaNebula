@@ -53,8 +53,8 @@ Updated Gas Prices - https://fcd.terra.dev/v1/txs/gas_prices
 '''theo fee one and two must be adjusted depending on dex!!!'''
 '''market impact calc will be added using x*y = (x+deltaX)*(y+deltaY) where deltaX and deltaY
 are the amounts of each asset we are depositing and removing'''
-def luna_ust_arb(dex_buy='astro', dex_sell='terraswap', denom_buy='uusd', denom_sell='uluna', algo_name='astro-ts',
-    theo_fee1=.00205, theo_fee2 =.00305, client=None, walletkey=None, thresh=.0010, pcttrade=.75):
+def arb(dex_buy='astro', dex_sell='terraswap', denom_buy='uusd', denom_sell='uluna', algo_name='astro-ts',
+    pair='luna-ust', theo_fee1=.00205, theo_fee2 =.00305, client=None, walletkey=None, thresh=.0010, pcttrade=.75):
 
     #inputs
     raw_price_last1 = 0
@@ -82,8 +82,8 @@ def luna_ust_arb(dex_buy='astro', dex_sell='terraswap', denom_buy='uusd', denom_
 
             try:
                 now = dt.datetime.now()
-                dex1_address = ContractInfo().dexes[dex_buy]['luna-ust']['mainnet']
-                dex2_address = ContractInfo().dexes[dex_sell]['luna-ust']['mainnet']
+                dex1_address = ContractInfo().dexes[dex_buy][pair]['mainnet']
+                dex2_address = ContractInfo().dexes[dex_sell][pair]['mainnet']
 
                 dex1 = requests.get(
                     "https://lcd.terra.dev/wasm/contracts/{0}/store?query_msg=%7B%22pool%22:%7B%7D%7D".format(str(dex1_address))
@@ -158,7 +158,7 @@ def luna_ust_arb(dex_buy='astro', dex_sell='terraswap', denom_buy='uusd', denom_
                     if (buy1sell2>thresh):
 
                         #Webhook of luna-ust dex arb bot channel
-                        mUrl = Discord().webhooks['luna-ust']
+                        mUrl = Discord().webhooks[pair]
 
                         data = {
                             "content": 'Attempting an arbitrage on ' +
@@ -271,7 +271,7 @@ def luna_ust_arb(dex_buy='astro', dex_sell='terraswap', denom_buy='uusd', denom_
             # any exceptions lets shut down for now and analyze mistakes
             except Exception as e:
                 #Webhook of luna-ust dex arb bot channel
-                mUrl = Discord().webhooks['luna-ust']
+                mUrl = Discord().webhooks[pair]
 
                 data = {
                     "content": 'Exception handling received: ' +
