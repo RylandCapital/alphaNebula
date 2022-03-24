@@ -1,4 +1,4 @@
-from terra_sdk.client.lcd import LCDClient
+from terra_sdk.client.lcd import LCDClient, AsyncLCDClient
 from terra_sdk.core import AccAddress
 from enum import Enum
 from datetime import datetime, timezone
@@ -17,14 +17,17 @@ class TerraClient:
         self.network = TerraNetwork[network]
         self.client = LCDClient(
             chain_id=self.network.value,
-            url="https://lcd.terra.dev" if self.network == TerraNetwork.MAINNET else "https://bombay-lcd.terra.dev"
+            url="https://lcd.terra.dev" if self.network == TerraNetwork.MAINNET else "https://bombay-lcd.terra.dev",
         )
 
     def get_block_time(self):
-        return int(datetime.strptime(
-            self.client.tendermint.block_info()["block"]["header"]["time"][:-4],
-            "%Y-%m-%dT%H:%M:%S.%f"
-        ).replace(tzinfo=timezone.utc).timestamp())
+        return int(
+            datetime.strptime(
+                self.client.tendermint.block_info()["block"]["header"]["time"][:-4], "%Y-%m-%dT%H:%M:%S.%f"
+            )
+            .replace(tzinfo=timezone.utc)
+            .timestamp()
+        )
 
     def get_asset_balance(self, user_address: str, asset_address: str) -> int:
         response = self.client.wasm.contract_query(asset_address, {"balance": {"address": user_address}})
