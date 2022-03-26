@@ -54,7 +54,7 @@ class StrategyExecutor:
         tx = await self.terra.create_and_sign_tx(
             CreateTxOptions(msgs=msgs, gas_prices="0.15uusd", memo=memo, fee=fee)
         )
-        output = await self.terra_client.tx.broadcast(tx)
+        output = await self.terra_client.tx.broadcast_sync(tx)
 
         # Post transaction
         status = output.is_tx_error()
@@ -76,7 +76,7 @@ class StrategyExecutor:
     async def waitAllTransactions(self):
         self.transactionOutput = await asyncio.gather(*self.transactions)
 
-    async def __del__(self):
+    async def close(self):
         print("Closing all connections")
         self.terra.session.close()
 
@@ -114,6 +114,8 @@ async def main():
 
     for i in range(10):
         print(i, strategy.transactionOutput[i])
+
+    await strategy.close()
 
     # async with AsyncLCDClient("https://lcd.terra.dev", "columbus-5") as terra:
     #     messages = []
