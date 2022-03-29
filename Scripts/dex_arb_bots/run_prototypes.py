@@ -252,8 +252,8 @@ if __name__ == "__main__":
         'dex_sell':'astro', #dex you are selling on
         'denom_buy':'uusd', #what you are using to buy 
         'denom_sell':'terra12hgwnpupflfpuual532wgrxu2gjp0tcagzgx4n', #what you are selling
-        'algo_name':'mars-ust.ts_loop', #name for output
-        'pair':'lunax-luna', #name used for contractInfo and Discord hooks
+        'algo_name':'mars-ust.ts_astro', #name for output
+        'pair':'mars-ust', #name used for contractInfo and Discord hooks
         'theo_fee1':.00305, #swap fee buy dex
         'theo_fee2' :.00305, #sawp fee sell dex
         'client':terra,
@@ -266,10 +266,10 @@ if __name__ == "__main__":
     bot16 = threading.Thread(target=arb, kwargs={
         'dex_buy':'astro', #dex you are buying on 
         'dex_sell':'terraswap', #dex you are selling on
-        'denom_buy':'uluna', #what you are using to buy 
+        'denom_buy':'uusd', #what you are using to buy 
         'denom_sell':'terra12hgwnpupflfpuual532wgrxu2gjp0tcagzgx4n', #what you are selling
-        'algo_name':'lunaxluna.loop_ts', #name for output
-        'pair':'lunax-luna', #name used for contractInfo and Discord hooks
+        'algo_name':'mars-ust.ts_astro', #name for output
+        'pair':'mars-ust', #name used for contractInfo and Discord hooks
         'theo_fee1':.00305, #swap fee buy dex
         'theo_fee2' :.00305, #sawp fee sell dex
         'client':terra,
@@ -282,6 +282,8 @@ if __name__ == "__main__":
 
     
 
+  
+
     bots = [
      bot1,
      bot2,
@@ -292,7 +294,7 @@ if __name__ == "__main__":
      bot14,
      bot15,
      bot16
-     ]
+    ]
     
     for bot in bots:
         bot.start()

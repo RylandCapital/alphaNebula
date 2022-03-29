@@ -2,7 +2,7 @@ import requests
 import time
 import datetime as dt
 import pandas as pd
-import json
+import base64, json
 import os
 
 from terra_sdk.client.lcd import LCDClient
@@ -15,7 +15,6 @@ from terra_sdk.client.lcd.api.tx import CreateTxOptions
 from terra_sdk.core.fee import Fee
 
 from Scripts.utils.contract_info import ContractInfo
-from Scripts.utils.alerts import Discord
 
 from contextlib import redirect_stdout
 from printPrepender import PrintPrepender
@@ -53,8 +52,21 @@ Updated Gas Prices - https://fcd.terra.dev/v1/txs/gas_prices
 '''theo fee one and two must be adjusted depending on dex!!!'''
 '''market impact calc will be added using x*y = (x+deltaX)*(y+deltaY) where deltaX and deltaY
 are the amounts of each asset we are depositing and removing'''
-def arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_sell='terra12hgwnpupflfpuual532wgrxu2gjp0tcagzgx4n', algo_name='ts-astro',
-    pair='mars-ust', theo_fee1=.00305, theo_fee2 =.00305, client=None, walletkey=None, thresh=.0035, pcttrade=.75):
+def arb(dex_buy='terraswap',
+        dex_sell='astro',
+        denom_buy='uusd',
+        denom_sell='terra12hgwnpupflfpuual532wgrxu2gjp0tcagzgx4n',
+        algo_name='ts-astro',
+        pair='mars-ust',
+        native=False,
+        theo_fee1=.00305,
+        theo_fee2 =.00305,
+        client=None,
+        walletkey=None,
+        thresh=.0035,
+        pcttrade=.75,
+        alerthook=None
+        ):
 
     #inputs
     raw_price_last1 = 0
@@ -64,7 +76,6 @@ def arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_sell='ter
     run = True
     raw_price_last1 = 0
     raw_price_last2 = 0
-    positives = [{}] #collect positive timstamps as test
     post_banks = [pd.DataFrame([])]
     theodf = pd.DataFrame([], columns=[
         'dex1_theo',
@@ -75,12 +86,17 @@ def arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_sell='ter
         'dex2_offer',
         ]
     )
-    while run == True:
-        try:
-            now = dt.datetime.now()
-            dex1_address = ContractInfo().dexes[dex_buy][pair]['mainnet']
-            dex2_address = ContractInfo().dexes[dex_sell][pair]['mainnet']
+    best_theo = -1000
+    best_theofees = -1000
 
+    dex1_address = ContractInfo().dexes[dex_buy][pair]['mainnet']
+    dex2_address = ContractInfo().dexes[dex_sell][pair]['mainnet']
+    while run == True:
+
+            #run time
+            now = dt.datetime.now()
+
+            #ping asset amounts
             dex1 = requests.get(
                 "https://lcd.terra.dev/wasm/contracts/{0}/store?query_msg=%7B%22pool%22:%7B%7D%7D".format(str(dex1_address))
                 ).json()
@@ -120,88 +136,41 @@ def arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_sell='ter
             
             #looking for bid offer crosses
             buy1sell2 = dex2_bid_ask[0]/dex1_bid_ask[1]-1 #bid-dex2/offer-dex1
-            buy2sell1 = dex1_bid_ask[0]/dex2_bid_ask[1]-1 #bid-dex1/offer-dex2
 
-            #only/collect print data if anything has changed, aka trades have occured in pool to avoid clutter
-            if (raw_price_last1 != raw_price1) | (raw_price_last2 != raw_price2):
-                print(
-                    "{0}.{1}.{2} ".format(pair, dex_buy, dex_sell) +
-                    "{0} ".format(now) +
-                    "THEO: {0}% ".format(
-                        round(abs(raw_price1/raw_price2-1)*100,4)) + 
-                        '-' +
-                        ' THEO+FEES: {0}%'.format(
-                            round(buy1sell2*100,4)
-                        )
-                    )
-
-                #collect for analysis
-                    #theos
-                theodf.loc[now, 'dex1_theo'] = raw_price1
-                theodf.loc[now, 'dex2_theo'] = raw_price2
-                theodf.loc[now, 'dex1_bid'] = dex1_bid_ask[0]
-                theodf.loc[now, 'dex1_offer'] = dex1_bid_ask[1]
-                theodf.loc[now, 'dex2_bid'] = dex2_bid_ask[0]
-                theodf.loc[now, 'dex2_offer'] = dex2_bid_ask[1]
-
-                    #positive arb opportunities 
-                if (buy1sell2>0) | (buy2sell1>0):
-                    positives.append({
-                        'datetime':'now',
-                        'buy1sell2':buy1sell2,
-                        'buy2sell1':buy2sell1,
-                    })
-
-            #update lasts
-            raw_price_last1 = raw_price1
-            raw_price_last2 = raw_price2
-
-            #make trades if applicable this makes sure trades are fired on start of algo
+            #IMMEDIATELY MAKE TRADE IF NEEDED
             if (raw_price_last1!=0) | (raw_price_last2!=0):
 
                 #if dex1 is the buy side dex send buy message to dex1, sell to dex2
                 if (buy1sell2>thresh):
-
-                    #Webhook of luna-ust dex arb bot channel
-                    mUrl = Discord().webhooks[pair]
-
-                    data = {
-                        "content": 'Attempting an arbitrage on ' +
-                        "{0}-{1}".format(denom_buy, denom_sell) +
-                        ' between {0}'.format(algo_name) +
-                        ' with a thresh of {0}'.format(thresh)
-                        }
-                    requests.post(mUrl, json=data)
-
                     # Gets (what seems random) connection reset error, retrying seems to fix. 
                         # FIXES ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
                     try:
                         mk = MnemonicKey(
                         mnemonic=walletkey
                         )
-                        wallet = client.wallet(mk)
                         # Grab bank and format in a way that does error out whether there are 2 or 100 currencies.
                         bank = pd.DataFrame(
-                            client.bank.balance(wallet.key.acc_address)[0].to_data()
-                        ).set_index('denom').astype(int)
+                            client.bank.balance(mk.acc_address)[0].to_data()
+                        ).set_index('denom').astype(int) 
                     except Exception as e:
                         print('attempt 2 on wallet connect: {0}'.format(e))
                         mk = MnemonicKey(
                         mnemonic=walletkey
                         )
-                        wallet = client.wallet(mk)
+                        # Grab bank and format in a way that does error out whether there are 2 or 100 currencies.
                         bank = pd.DataFrame(
-                            client.bank.balance(wallet.key.acc_address)[0].to_data()
+                            client.bank.balance(mk.acc_address)[0].to_data()
                         ).set_index('denom').astype(int)
-                                
+
+                      
                     msgs = [
                     MsgExecuteContract(
-                                wallet.key.acc_address,
+                                mk.acc_address,
                                 dex1_address,
                                 {
                                 "swap": {
                                     "belief_price": "{0}".format(dex1_bid_ask[1]), #hit the offer on dex1
-                                    "max_spread": "0.001",
+                                    "max_spread": "0.0015",
                                     "offer_asset": {
                                     "amount": "{0}".format(int(bank.loc[denom_buy,'amount']*pcttrade)),
                                     "info": {
@@ -213,77 +182,153 @@ def arb(dex_buy='terraswap', dex_sell='astro', denom_buy='uusd', denom_sell='ter
                                 }
                                 },
                             { denom_buy: int(bank.loc[denom_buy,'amount']*pcttrade) }
-                            ),
-                    MsgExecuteContract(
-                                wallet.key.acc_address,
-                                dex2_address,
-                                {
-                                "swap": {
-                                    "belief_price": "{0}".format(dex2_bid_ask[0]),
-                                    "max_spread": "0.001",
-                                    "offer_asset": {
-                                    "amount": "{0}".format(
+                            )]
+                    #if you are selling a native coin like uluna then send this message to execuete the sell side tx
+                    if native==True:
+                        msgs.append(
+                                    MsgExecuteContract(
+                                    mk.acc_address,
+                                    dex2_address,
+                                    {
+                                    "swap": {
+                                        "belief_price": "{0}".format(dex2_bid_ask[0]),
+                                        "max_spread": "0.0015",
+                                        "offer_asset": {
+                                        "amount": "{0}".format(
 
-                                        int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[1]) #using $ value of UST used to buy / dex 1 predicted offer price offer price 
+                                            int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[1]) #using $ value of UST used to buy / dex 1 predicted offer price offer price 
 
-                                        ), 
-                                    "info": {
-                                        "native_token": {
-                                        "denom": "{0}".format(denom_sell)
+                                            ), 
+                                        "info": {
+                                            "native_token": {
+                                            "denom": "{0}".format(denom_sell)
+                                            }
+                                        }
                                         }
                                     }
+                                    },
+                                { denom_sell: int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[1]) }
+                                )
+                        )
+                    #or if selling a non-native coin like mars, anc, etx then send this message to execuete the sell side tx
+                    else:
+                        msg = {
+                               "swap": {
+                                    "belief_price": "{0}".format(dex2_bid_ask[0]),
+                                    "max_spread": "0.0015"
                                     }
                                 }
+                        msgs.append(
+                            MsgExecuteContract(
+                                mk.acc_address,
+                                denom_sell, #token contract you are selling 
+                                {
+                                    "send": {
+                                        "contract": dex2_address,
+                                        "amount": '{0}'.format(int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[1])),
+                                        'msg': base64.b64encode(bytes(json.dumps(msg), "ascii")).decode(),
+                                    }
                                 },
-                            { denom_sell: int(bank.loc[denom_buy,'amount']*pcttrade / dex1_bid_ask[1]) }
-                            )
-                    ]
-                    
+                                
+                            ),
+                        )
+                        
+                    wallet = terra.wallet(mk)
                     tx = wallet.create_and_sign_tx(
                     CreateTxOptions(msgs=msgs,
-                    gas_prices="0.15uusd"),
-                    gas_adjustment="1.2"
+                    gas_prices="0.15uusd",
+                    gas_adjustment="1.2")
                         )
                     client.tx.broadcast(tx)
 
-
-                    #(trade is over, no rush, so 2 sec sleep)
-                    time.sleep(2)
-
-                    #collect data for review
-                    post_bank = pd.concat(
-                        [
-                        bank,
-                        pd.DataFrame(
-                            client.bank.balance(wallet.key.acc_address)[0].to_data()
-                        ).set_index('denom').astype(int)
-                    ], axis=1
-                    )
-                    post_bank['diff'] = (post_bank.iloc[:,1]-post_bank.iloc[:,0])/1000000
-                    post_bank['trade_execution'] = now
-                    post_banks.append(post_banks)
-
+                    #TRADE IS OVER COLLECT PRE TRADE DATA
+                    
+                    #print in console
+                    print('Trade Executed ...\n')
+                    print('Here are the pre-trade-stats')
+                    theodf.loc[now, 'dex1_theo'] = raw_price1
+                    theodf.loc[now, 'dex2_theo'] = raw_price2
+                    theodf.loc[now, 'dex1_bid'] = dex1_bid_ask[0]
+                    theodf.loc[now, 'dex1_offer'] = dex1_bid_ask[1]
+                    theodf.loc[now, 'dex2_bid'] = dex2_bid_ask[0]
+                    theodf.loc[now, 'dex2_offer'] = dex2_bid_ask[1]
+                    print(theodf.T.to_dict())
+                    
+                    #send to discord
+                    data = {
+                        "content": 'Attempting an arbitrage on ' +
+                        "{0}-{1}".format(denom_buy, denom_sell) +
+                        ' between {0}'.format(algo_name) +
+                        ' with a thresh of {0}'.format(thresh)
+                        }
+                    requests.post(alerthook, json=data)
 
                     #sleep to make avoid dups/rapid fire
                         #honestly just a safety measure, theoretically you might have back to back 
                         #opportunities to arb, but for now lets sleep for a little and then look for more
-                    print('Sleeping for 60 seconds ...\n\n\n')
+                    
+                    
                     time.sleep(60)
+                    
 
+
+            #update best prices so far for viewing analysis in console
+            if (raw_price2/raw_price1-1) > best_theo:
+                best_theo = (raw_price2/raw_price1-1)
+            if (buy1sell2) > best_theofees:
+                best_theofees = buy1sell2
+            
+                
+
+            #only/collect print data if anything has changed, aka trades have occured in pool to avoid clutter
+            if (raw_price_last1 != raw_price1) | (raw_price_last2 != raw_price2):
+                print(
+                        "{0}.{1}.{2} ".format(pair, dex_buy, dex_sell) +
+                        "{0} ".format(now) +
+                        "RAW PRICE DEX1 {0} ".format(raw_price1) + 
+                        "RAW PRICE DEX2 {0} ".format(raw_price2) + 
+                        "THEO ARB: {0} ".format(
+                        (raw_price2/raw_price1-1)) + 
+                        '-' +
+                        ' ARB W FEES FEES: {0} '.format(
+                            buy1sell2
+                        )
+                        + '   BEST {0} : {1}'.format(best_theo, best_theofees)
+
+                )
+
+                #update lasts
+                raw_price_last1 = raw_price1
+                raw_price_last2 = raw_price2
+
+            
             #1 second increment between DEX queries looking for arbitrade situations
             time.sleep(1)
 
-        # any exceptions lets shut down for now and analyze mistakes
-        except Exception as e:
-            #Webhook of luna-ust dex arb bot channel
-            mUrl = Discord().webhooks[pair]
 
-            data = {
-                "content": 'Exception handling received: ' +
-                "{0}-{1}".format(denom_buy, denom_sell) +
-                ' between {0}'.format(algo_name) +
-                '\n Error: {0}'.format(e)
-            }
-            requests.post(mUrl, json=data)    
-            break  
 
+
+NEBULA_MK = os.getenv("NEBULA_MK")
+DISCORD_LUNAUST = os.getenv("DISCORD_LUNAUST")
+DISCORD_ANCUST = os.getenv("DISCORD_ANCUST")
+DISCORD_LUNAXLUNA = os.getenv("DISCORD_LUNAXLUNA")
+DISCORD_MARSUST = os.getenv("DISCORD_MARSUST")
+
+terra = LCDClient(
+    "https://lcd.terra.dev", "columbus-5"
+    )
+
+arb(dex_buy='terraswap',
+    dex_sell='astro',
+    denom_buy='uusd',
+    denom_sell='terra14z56l0fp2lsf86zy3hty2z47ezkhnthtr9yq76',
+    algo_name='ts_astro',
+    pair='anc-ust',
+    native=False,
+    theo_fee1=.00305,
+    theo_fee2 =.00305,
+    client=terra,
+    walletkey=NEBULA_MK,
+    thresh=.0035,
+    pcttrade=.50,
+    alerthook=DISCORD_ANCUST)
