@@ -2,9 +2,14 @@ class ContractInfo:
 
     def __init__(self):
         self.clusters = {
+                #https://docs.neb.money/protocol/clusters.html
                 'testnet': {
                     'clusters':{
                         'MAU':'terra1rhuwcluvgnql4f0xlhzmxlrgk22q65ym646sk2',
+                        'LUST':'terra1f08qvrr4gpwdxqlxpgg559kdc5wl2gzgh3c00a'
+                    },
+                    'pool':{
+                        'LUST-UST':'terra1m4d3we3fwny5dwvda9yy27829y8pt46z0jzykq'
                     },
                     'chain_id':'bombay-12',
                     'chain_url':'https://bombay-fcd.terra.dev/'
